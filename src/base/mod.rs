@@ -4,7 +4,6 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{
     collections::HashMap,
-    error::Error,
     fs::OpenOptions,
     io::{self, prelude::*, BufReader, BufWriter},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
@@ -12,12 +11,12 @@ use std::{
 
 const REGISTRY_FHANDLE_NAME: &str = "RegistrySerialized.txt";
 const REGISTRY_LISTEN_PORT: usize = 61_000;
-
+pub const APP_REGISTRY: &str = "Presence.raven";
 
 #[derive(PartialEq, Serialize, Deserialize, Clone)]
 pub struct Node {
-    master: Option<IpAddr>,
-    ip_addr: IpAddr,
+    pub master: Option<IpAddr>,
+    pub ip_addr: IpAddr,
     port_num: usize,
 }
 
