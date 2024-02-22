@@ -1,82 +1,98 @@
-//ahhhh the protocols to handle the BS I've built in `base`
-//God help me
-
-//there will be no structs declared here. It's just a series of procedures that deal will how to senders and recievers 
-//will behave on startup and all
-
-
-use crate::base::{Node, Master};
-
-use serde_bytes;
-use sanitize_filename::{self, sanitize_with_options, Options};
 use std::{
-    fs,
-    io::{ErrorKind, Write}, prelude::*,
-    time, net::IpAddr,
+    env,
+    fs::OpenOptions,
+    io::{self, BufReader, BufWriter, ErrorKind, Read, Write}, 
+    net::{ IpAddr, SocketAddr, TcpListener, TcpStream}, 
+    process::{Command, Stdio}, 
+    thread, 
+    time::Duration
 };
 
-#[cfg(target_os = "windows")]
-const USAGE: &str = r#"
-raven.exe SEND ID FPATH
-raven.exe UPGRADE 
-raven.exe ADD IP_ADDR
-raven.exe RM ID
-"#;
+const SEND_ATTEMPTS: usize = 3;
 
-const UNSAFE_WARNING: &str = r#"
-This operation is UNSAFE! Perform this away from people and cameras, if possible
-"#;
-
-const WELCOME_MSG: &str = r#"
-This is Raven, a secure means of sending data from one device to another without any third party interference
-Except the one you and your friends/group/associates/company officially designate
-Enjoy!
-"#;
-
-
-pub fn santize_fpath(file_path: &str) -> String{
-    return sanitize_with_options(file_path, Options{windows: true, truncate: true, replacement: ""});
+pub fn try_send(raw_ip: &IpAddr, file_path: &String) -> io::Result<()> {
+    let fhandle = OpenOptions::new().read(true).open(file_path).expect("File could not be accessed");
+    let mut reader = BufReader::new(fhandle);
+    let stream = TcpStream::connect(SocketAddr::new(*raw_ip, 21_000))?;
+    let mut bufwr = BufWriter::new(stream);
+    let _ = io::copy(&mut reader, &mut bufwr);
+    bufwr.write(b"\n")?;
+    return Ok(());
 }
 
-fn check_if_prev_present() -> bool {
-    let tfhandle = match fs::File::open(base::APP_REGISTRY){
-        Ok(_) => true,
-        Err(err) => match err.kind(){
-            ErrorKind::NotFound => install(),
-            _ => {eprintln!("Error encountered: {err:?}"); false}
+pub fn naked_try_send() -> io::Result<()>{
+    let stream = TcpStream::connect("172.26.166.42:21000")?;
+    let mut writer = BufWriter::new(stream);
+    writer.write_all(b"Hello Eric!")?;
+    return Ok(())
+}
+
+pub fn listen() -> io::Result<()> {
+    let listener = TcpListener::bind(
+        "0.0.0.0:21000")?;
+    let mut container = String::new();
+    match listener.accept() {
+        Ok((mut stream, _)) => {
+            stream.read_to_string(&mut container)?;
+            println!("{}", container);
+            thread::sleep(Duration::from_secs(5));
+            return Ok(());
         }
-    };
-    return tfhandle;
-}
-
-
-fn install() -> bool{
-    let thandle = fs::File::create(base::APP_REGISTRY).unwrap();
-    //add other things here?
-    //it's just to create the registry file 
-    //maybe we can write an instant (i.e. moment of creation, and use that as a key for encypting the registry and other files)
-    let epoch = time::Instant::now();
-    return true;
-}
-
-fn connect_if_master(device_node: &Node, addr: &usize, ) -> (){
-    let master = device_node.master;
-    if let Some(var) = master{
-        //if there is a master to be specified, call that master and handle transactions with it
-        
-    };
-}
-
-fn build_into_master(device_node: &Node) -> Master{
-    todo!()
-}
-
-fn connect_if_ip(device_node: &Node, addr: &IpAddr) -> (){
-    todo!()
+        Err(_) => panic!("Error accepting stream"),
+    }
 }
 
 
 
 
+pub fn f_write(fpath: &String, ip: &IpAddr) -> io::Result<()>{
+    let stream = TcpStream::connect(SocketAddr::new(*ip, 21_000))?;
+    let mut bufw = BufWriter::new(stream);
+    let fhandle = OpenOptions::new().read(true).open(fpath)?;
+    let mut bufr = BufReader::new(fhandle);
+    //io::copy to bufw and bufr
+
+    let val = io::copy(&mut bufr, &mut bufw)?;
+    println!("{} have been copied to the stream", val);
+    return Ok(());
+}
+
+pub fn send_details(fpath: &String, ip:& IpAddr) -> io::Result<()>{
+    let stream = TcpStream::connect(SocketAddr::new(*ip, 21_000))?;
+    let mut bufw = BufWriter::new(stream);
+    bufw.write_all(fpath.as_bytes())?;
+    return Ok(());
+}
+
+pub fn send_with_retries(addr: &IpAddr, fname: &String) -> io::Result<()>{
+    let mut tries = SEND_ATTEMPTS.clone();
+    while tries > 0{
+        match try_send(addr, fname){
+            Ok(_) => return Ok(()),
+            Err(err) => match err.kind(){
+                ErrorKind::ConnectionAborted => {
+                    eprintln!("The connection was aborted by the remote client. {} tries remain", tries);
+                    tries -= 1;
+                    
+                }
+                ErrorKind::ConnectionReset => {
+                    eprintln!("The connection was reset by the remote client. {} tries remain", tries);
+                    tries -= 1;
+                }
+                ErrorKind::TimedOut => {
+                    eprintln!("The operation could not be completed in time. {} tries remain", tries);
+                    tries -= 1;
+                }
+                err => {
+                    eprintln!("Unexpected Error: {}. {} retries left", err, tries);
+                    tries -= 1;
+                }
+            }
+        }
+    }
 
 
+
+    Ok(())
+
+}
