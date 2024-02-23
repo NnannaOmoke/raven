@@ -14,7 +14,7 @@ The naked call will bind to a port on your PC until you manually terminate the p
 
 static mut LISTEN_FLAG_RUN_OPTION: Option<bool> = None;
 
-fn main() -> () {
+fn main(){
 
 
 }

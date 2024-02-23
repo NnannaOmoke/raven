@@ -31,11 +31,21 @@ fn raw_send(raw_ip: &IpAddr, file_path: &String) -> io::Result<()> {
     Ok(())
 }
 
+fn raw_listen() -> io::Result<()>{
+    let listener = TcpListener::bind("0.0.0.0:21000")?;
+    for container in listener.incoming(){
+        //maybe put the name of the file in the first, maybe 255 bytes of the stream?
+        let stream = container?;
+        write_to_file(stream)?;
+    }
+    Ok(())
+}
+
 fn test() -> io::Result<()>{
     let stream = TcpStream::connect("172.26.166.42:21000")?;
     let mut bufw = BufWriter::new(stream);
     bufw.write_all(b"Hello Eric!")?;
-    return Ok(())
+    Ok(())
 }
 
 
@@ -55,7 +65,7 @@ fn write_to_file(stream: TcpStream) -> io::Result<()>{
 
 
 pub fn send_with_retries(addr: &IpAddr, fname: &String) -> io::Result<()>{
-    let mut tries = SEND_ATTEMPTS.clone();
+    let mut tries = SEND_ATTEMPTS;
     while tries > 0{
         match raw_send(addr, fname){
             Ok(_) => return Ok(()),
@@ -99,12 +109,14 @@ pub fn send_with_retries(addr: &IpAddr, fname: &String) -> io::Result<()>{
     Ok(())
 }
 
-pub fn listen() -> io::Result<()>{
-    let listener = TcpListener::bind("0.0.0.0:21000")?;
-    for container in listener.incoming(){
-        //maybe put the name of the file in the first, maybe 255 bytes of the stream?
-        let stream = container?;
-        write_to_file(stream)?;
+pub fn listen() -> (){
+    match raw_listen(){
+        Ok(()) => {}
+        Err(error) => {
+            eprintln!("Error raised by listening module: {}", error.to_string());
+            eprintln!("Restarting listening module!");
+            eprintln!("If restarting does not fix the problem, pass nkrypt kill-listener to the command line");
+            listen();
+        }
     }
-    Ok(())
 }
