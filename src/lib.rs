@@ -1,13 +1,16 @@
 #![allow(dead_code)]
-///This contains the basic structs and methods and means that they interact with each other
-pub mod base;
-///This is the application code for the raven CLI
-pub mod core;
+pub use std::{
+    fs::OpenOptions,
+    io::{self, BufReader, BufWriter, ErrorKind, Read, Write}, 
+    net::{ IpAddr, SocketAddr, TcpListener, TcpStream},  
+    thread, 
+    time::Duration
+};
+
+mod core;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests{
+   // use super::*;
 
-    #[test]
-    fn it_works() {}
 }
